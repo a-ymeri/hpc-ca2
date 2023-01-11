@@ -88,6 +88,7 @@ int main(int argc, char *argv[]) {
 
   */
     int rows_per_proc = m / num_procs;
+    printf("rows_per_proc: %d", rows_per_proc);
     int remainder = m % num_procs;
 
     int *send_counts = NULL;
@@ -114,7 +115,7 @@ int main(int argc, char *argv[]) {
     
     // allocate memory for the chunk
     float *chunk = (float *)malloc(send_counts[rank] * sizeof(float));
-    printf("rank: %d, send_counts*n: %f \n", rank, send_counts[rank]*n);
+    printf("rank: %d, send_counts: %d \n", rank, send_counts[rank]);
 
     //mpi block so we can time it
 
@@ -150,7 +151,6 @@ int main(int argc, char *argv[]) {
     int chunk_c_size = rows * p;
     float *chunk_c = (float *)malloc(chunk_c_size * sizeof(float));
 
-    printf("hell");
 
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j<p; j++){
