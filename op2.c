@@ -261,16 +261,16 @@ int main(int argc, char *argv[]) {
     //     }
     // }
 
-    // if(rank == 0){
-    //     //print the result to c_file
-    //     fp = fopen(c_file, "w");
-    //     fprintf(fp, "%d %d \n", m, p);
-    //     for (int i = 0; i < m*p; i++) {
-    //         fprintf(fp, "%f ", final_data[i]);
-    //     }
+    if(rank == 0){
+        //print the result to c_file
+        fp = fopen(c_file, "w");
+        fprintf(fp, "%d %d \n", m, p);
+        for (int i = 0; i < m*p; i++) {
+            fprintf(fp, "%f ", final_data[i]);
+        }
 
-    //     fclose(fp);
-    // }
+        fclose(fp);
+    }
 
 // clean up memory and finalize MPI
 // free(chunk);
