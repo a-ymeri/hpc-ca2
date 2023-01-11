@@ -40,7 +40,7 @@ echo "Scheduling priority          : $SLURM_PRIO_PROCESS"
 
 
 # parallel using MPI
-SRC=ass1.c
+SRC=op3.c
 EXE=${SRC%%.c}.exe
 echo compiling $SRC to $EXE
 
