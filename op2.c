@@ -113,8 +113,8 @@ int main(int argc, char *argv[]) {
     }
     
     // allocate memory for the chunk
-    float *chunk = (float *)malloc(send_counts[rank] * n * sizeof(float));
-    printf("rank: %d, send_counts*n: %d \n", rank, send_counts[rank]*n);
+    float *chunk = (float *)malloc(send_counts[rank] * sizeof(float));
+    printf("rank: %d, send_counts*n: %f \n", rank, send_counts[rank]*n);
 
     //mpi block so we can time it
 
