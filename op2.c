@@ -9,6 +9,7 @@ int main(int argc, char *argv[]) {
     //get time
     double start = MPI_Wtime();
 
+
   // get the number of processes
   int num_procs;
   MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -36,13 +37,13 @@ int main(int argc, char *argv[]) {
   int matrix_size = m * n;
 
     float *A = NULL;
-    if (rank == 0) {
-        A = (float *)malloc(matrix_size * sizeof(float));
+    A = (float *)malloc(matrix_size * sizeof(float));
+    // if (rank == 0) {
         //read second line of a.dat
         for (int i = 0; i < matrix_size; i++) {
             fscanf(fp, "%f", &A[i]);
         }
-    }
+    // }
 
 
 
@@ -68,6 +69,8 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < matrix_size_b; i++) {
         fscanf(fp, "%f", &B[i]);
     }
+
+
     // }
 
 
@@ -145,6 +148,8 @@ int main(int argc, char *argv[]) {
     int chunk_c_size = rows * p;
     float *chunk_c = (float *)malloc(chunk_c_size * sizeof(float));
 
+    printf("hell");
+
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j<p; j++){
             local_sum = 0;
@@ -213,46 +218,57 @@ int main(int argc, char *argv[]) {
 
     
     // print the final array on rank a0
-    if (rank == 0) {
+    // if (rank == 0) {
 
-        //read c.dat
-        fp = fopen(c_file, "r");
-        int m2, p2;
+    //     //read c.dat
+    //     fp = fopen(c_file, "r");
+    //     int m2, p2;
 
-        //first line of c.dat is m and p
-        fscanf(fp, "%d %d", &m2, &p2);
+    //     //first line of c.dat is m and p
+    //     fscanf(fp, "%d %d", &m2, &p2);
 
-        // if (m != m2 || p != p2) {
-        //     printf("Error: m != m2 || p != p2");
-        //     return 1;
-        // }
+    //     // if (m != m2 || p != p2) {
+    //     //     printf("Error: m != m2 || p != p2");
+    //     //     return 1;
+    //     // }
 
-        int matrix_size_c = m * p;
+    //     int matrix_size_c = m * p;
 
-        float *C = NULL;
+    //     float *C = NULL;
 
-        C = (float *)malloc(matrix_size_c * sizeof(float));
+    //     C = (float *)malloc(matrix_size_c * sizeof(float));
 
-        //read second line of c.dat
+    //     //read second line of c.dat
 
-        for (int i = 0; i < matrix_size_c; i++) {
-            fscanf(fp, "%f", &C[i]);
-        }
+    //     for (int i = 0; i < matrix_size_c; i++) {
+    //         fscanf(fp, "%f", &C[i]);
+    //     }
 
-        //compare final_data and C
-        for (int i = 0; i < m*p; i++) {
-            // printf("final_data[%d] = %f, C[%d] = %f \n", i, final_data[i], i, C[i]);
-            if (final_data[i] - C[i] > 0.0001) {
-                printf("Error: final_data[%d] != C[%d]", i, i);
-                printf("final_data[%d] = %f, C[%d] = %f \n", i, final_data[i], i, C[i]);
-                return 1;
-            }
-        }
+    //     //compare final_data and C
+    //     for (int i = 0; i < m*p; i++) {
+    //         // printf("final_data[%d] = %f, C[%d] = %f \n", i, final_data[i], i, C[i]);
+    //         if (final_data[i] - C[i] > 0.0001) {
+    //             printf("Error: final_data[%d] != C[%d]", i, i);
+    //             printf("final_data[%d] = %f, C[%d] = %f \n", i, final_data[i], i, C[i]);
+    //             return 1;
+    //         }
+    //     }
 
-        for (int i = 0; i < m*p; i++) {
-            // printf("final_data[%d] = %f \n", i, final_data[i]);
-        }
-    }
+    //     for (int i = 0; i < m*p; i++) {
+    //         // printf("final_data[%d] = %f \n", i, final_data[i]);
+    //     }
+    // }
+
+    // if(rank == 0){
+    //     //print the result to c_file
+    //     fp = fopen(c_file, "w");
+    //     fprintf(fp, "%d %d \n", m, p);
+    //     for (int i = 0; i < m*p; i++) {
+    //         fprintf(fp, "%f ", final_data[i]);
+    //     }
+
+    //     fclose(fp);
+    // }
 
 // clean up memory and finalize MPI
 // free(chunk);

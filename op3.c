@@ -58,6 +58,8 @@ int main(int argc, char *argv[])
     double start = MPI_Wtime(), start2;
 
     // Read input data from file "a.dat"
+
+    char *a_file = argv[1];
  
 
     int n;
@@ -66,7 +68,7 @@ int main(int argc, char *argv[])
     if (rank == 0)
     {
         FILE *fp;
-        fp = fopen("unsorted.txt", "r");
+        fp = fopen(a_file, "r");
         if (fp == NULL)
         {
             printf("Error opening file\n");
@@ -168,7 +170,24 @@ int main(int argc, char *argv[])
 
         printf("Time taken: %f \n", end - start);
         printf("Time taken since loading data: %f \n", end - start2);
+
+        // Write sorted data to file "b.dat"
+        FILE *fp;
+        fp = fopen(argv[2], "w");
+        if (fp == NULL)
+        {
+            printf("Error opening file\n");
+            exit(1);
+        }
+
+
+        fprintf(fp, "%d \n", n);
+        for (int i = 0; i < n; i++)
+            fprintf(fp, "%f ", temp_arr[i]);
+        fclose(fp);
+
     }
+
 
 
 

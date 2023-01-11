@@ -33,13 +33,13 @@ int main(int argc, char **argv)
     // first line of a.dat is n and m
     int b;
     fscanf(fp, "%d %d %d", &b, &m, &n);
-    b = b/16;
+    // b = b;
 
     // second line of a.dat is the array
     float *A = NULL;
     if (rank == 0)
     {
-        A = (float *)malloc(sizeof(float) * m * n);
+        A = (float *)malloc(sizeof(float) * b * m * n);
         for (int i = 0; i < m * n; i++)
         {
             fscanf(fp, "%f", &A[i]);
@@ -108,9 +108,8 @@ int main(int argc, char **argv)
         }
 
         displs[i] = 0;
-        for (int j = 0; j < i; j++)
-        {
-            displs[i] += send_counts[j];
+        if(i != 0){
+            displs[i] = displs[i-1] + send_counts[i-1];
         }
 
     }
@@ -122,9 +121,19 @@ int main(int argc, char **argv)
 
     MPI_Barrier(MPI_COMM_WORLD);
 
+
+    int start1 = displs[rank];
+    int end1 = displs[rank] + send_counts[rank];
+
+    // printf("rank: %d, start: %d, end: %d \n", rank, start1, end1);
+    // printf("First element: %f \n", A[start1]);
     // scatter the data to all processes
     MPI_Scatterv(A, send_counts, displs, MPI_FLOAT, chunk, chunk_size, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
+
+
+    //print chunk size per rank
+    printf("Rank: %d, chunk size: %f \n", rank, chunk_size);
 
     // double scatter_start = MPI_Wtime();
 
