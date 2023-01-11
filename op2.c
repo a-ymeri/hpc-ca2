@@ -37,13 +37,14 @@ int main(int argc, char *argv[]) {
   int matrix_size = m * n;
 
     float *A = NULL;
-    A = (float *)malloc(matrix_size * sizeof(float));
-    // if (rank == 0) {
+    if (rank == 0) {
+        A = (float *)malloc(matrix_size * sizeof(float));
+
         //read second line of a.dat
         for (int i = 0; i < matrix_size; i++) {
             fscanf(fp, "%f", &A[i]);
         }
-    // }
+    }
 
 
 
@@ -113,6 +114,7 @@ int main(int argc, char *argv[]) {
     
     // allocate memory for the chunk
     float *chunk = (float *)malloc(send_counts[rank] * n * sizeof(float));
+    printf("rank: %d, send_counts*n: %d \n", rank, send_counts[rank]*n);
 
     //mpi block so we can time it
 
@@ -120,7 +122,7 @@ int main(int argc, char *argv[]) {
 
     double scatter_start = MPI_Wtime();
 
-    MPI_Scatterv(A, send_counts, displs, MPI_INT, chunk, send_counts[rank], MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Scatterv(A, send_counts, displs, MPI_FLOAT, chunk, send_counts[rank], MPI_FLOAT, 0, MPI_COMM_WORLD);
 
 
   /*
