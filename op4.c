@@ -1,152 +1,321 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <mpi.h>
+#include <stdlib.h>
 
-#define ROOT 0
-
-int cmp(const void *a, const void *b)
+int main(int argc, char **argv)
 {
-    float diff = (*(float *)a - *(float *)b);
-    if(diff > 0)
-        return 1;
-    else if(diff < 0)
-        return -1;
-    else
-        return 0;
-    // return (*(float *)a - *(float *)b);
-}
 
-// Function to merge two sorted arrays
-void merge(float *a, float *b, float *c, int m, int n)
-{
-    int i = 0, j = 0, k = 0;
-
-    while (i < m && j < n)
-    {
-        if (a[i] < b[j])
-            c[k++] = a[i++];
-        else
-            c[k++] = b[j++];
-    }
-
-    // Append remaining elements from input arrays
-    while (i < m)
-        c[k++] = a[i++];
-    while (j < n)
-        c[k++] = b[j++];
-}
-
-int main(int argc, char *argv[])
-{
-    int my_rank, num_procs;
+    // initialize MPI
     MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+
+    // get time
+    double start = MPI_Wtime();
+
+    // get the number of processes
+    int num_procs;
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
-    // Read input data from file "a.dat"
+    // get the rank of the current process
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    // read a.dat
+    char *input = argv[1];
+    char *kernel = argv[2];
+    char *output_file = argv[3];
+    // char* output = argv[3];
+    // read a.dat
+
     FILE *fp;
-    fp = fopen("unsorted.txt", "r");
-    if (fp == NULL)
+    fp = fopen(input, "r");
+    int m, n; // a dimensions, m rows, n columns, b batches
+
+    // first line of a.dat is n and m
+    int b;
+    fscanf(fp, "%d %d %d", &b, &m, &n);
+
+    // second line of a.dat is the array
+    float *A = NULL;
+    if (rank == 0)
     {
-        printf("Error opening file\n");
-        exit(1);
+        A = (float *)malloc(sizeof(float) * m * n);
+        for (int i = 0; i < m * n; i++)
+        {
+            fscanf(fp, "%f", &A[i]);
+        }
+    }
+    // read b.dat
+    fp = fopen(kernel, "r");
+
+    float *C = NULL;
+    if (rank == 0)
+    {
+        C = (float *)malloc(sizeof(float) * m * n);
     }
 
-    int n;
-    fscanf(fp, "%d", &n);
-    float *arr = malloc(n * sizeof(float));
-    printf("n = %d", n);
-    for (int i = 0; i < n; i++)
-        fscanf(fp, "%f", &arr[i]);
-    fclose(fp);
+    int p;
+    // first line of b.dat is p and p. Only need one of them
+    fscanf(fp, "%d %d", &p, &p);
 
-    float *temp_arr = malloc(n * sizeof(float));
-    float *recv_buf = malloc(n * sizeof(float));
-    float *sorted_arr = malloc(n * sizeof(float));
-    float *global_arr = malloc(n * sizeof(float));
-
-   // Divide the array into equal-sized blocks and assign them to processes
-    int block_size = n / num_procs;
-    int start = my_rank * block_size;
-    int end = start + block_size - 1;
-    if (my_rank == num_procs - 1)
-        end = n - 1;
-
-    // Sort the block assigned to each process
-    for (int i = start; i <= end; i++)
-        temp_arr[i - start] = arr[i];
-    qsort(temp_arr, end - start + 1, sizeof(float), cmp);
-
-    // Merge the sorted blocks using a recursive doubling algorithm
-    for (int step = 1; step < num_procs; step *= 2)
+    float *B = NULL;
+    B = (float *)malloc(sizeof(float) * p * p);
+    for (int i = 0; i < p * p; i++)
     {
-        int partner = my_rank ^ step;
-        if (my_rank < partner)
+        fscanf(fp, "%f", &B[i]);
+    }
+
+    //   /*
+
+    //                                          |--------------------------------------------------|
+    //                                          |                                                  |
+    //                                          |                                                  |
+    //                                          |         SPLITTING THE WORK                       |
+    //                                          |                                                  |
+    //                                          |                                                  |
+    //                                          |--------------------------------------------------|
+
+    //   */
+
+    // floor of p-1 / 2
+    int b_lower = (p - 1) / 2;
+    // ceiling of p-1 / 2
+    int b_upper = p / 2;
+    // where to begin and end the row iterator
+    int row_start = b_lower;
+    int row_end = m - b_upper;
+
+    // where to begin and end the col iterator
+    int col_start = b_lower;
+    int col_end = n - b_upper;
+
+    int rows_to_split = row_end - row_start;
+    int rows_per_proc = rows_to_split / num_procs;
+    int remainder = rows_to_split % num_procs;
+
+    int *send_counts = NULL;
+    int *displs = NULL;
+
+    send_counts = (int *)malloc(num_procs * sizeof(int));
+    displs = (int *)malloc(num_procs * sizeof(int));
+
+    for (int i = 0; i < num_procs; i++)
+    {
+        int row_count = rows_per_proc;
+        if (i < remainder)
         {
-           MPI_Sendrecv(temp_arr, end - start + 1, MPI_FLOAT, partner, 0, recv_buf, n, MPI_FLOAT, partner, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            merge(temp_arr, recv_buf, sorted_arr, end - start + 1, n);
-            memcpy(temp_arr, sorted_arr, (end - start + 1 + n) * sizeof(float));
+            row_count++;
+        }
+        if (row_count == 0)
+        {
+            send_counts[i] = 0;
+        }
+        else
+        {
+            send_counts[i] = (row_count + b_lower + b_upper) * n;
+        }
+
+        displs[i] = 0;
+        if (i > 0)
+        {
+            int prev_row_count = (send_counts[i - 1] / n - b_lower - b_upper) * n;
+            displs[i] = displs[i - 1] + prev_row_count;
+        }
+
+        // if(rank == 0)
+        // printf("displs[%d]: %d \n", i, displs[i]);
+    }
+
+    // allocate memory for the chunk
+    int chunk_size = send_counts[rank];
+    float *chunk = (float *)malloc(chunk_size * sizeof(float));
+
+    //     //mpi block so we can time it
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    double scatter_start = MPI_Wtime();
+
+    if(rank == 0){
+        //copy outer layer of A to C
+        for (int i=0; i<m; i++) {
+            for (int j=0; j<n; j++) {
+                if(i < row_start || i >= row_end || j < col_start || j >= col_end) { //only cope outer layer
+                    C[i*n+j] = A[i*n+j];
+                }
+            }
+    }
+
+    }
+
+    // scatter the data
+    MPI_Scatterv(A, send_counts, displs, MPI_FLOAT, chunk, chunk_size, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+    //   /*
+
+    //     |--------------------------------------------------|
+    //     |                                                  |
+    //     |                                                  |
+    //     |         PERFORMING THE WORK                      |
+    //     |                                                  |
+    //     |                                                  |
+    //     |--------------------------------------------------|
+
+    double local_start = MPI_Wtime();
+
+    int row_count = send_counts[rank] / n;
+    int processed_rows = row_count - b_lower - b_upper;
+
+    float *output = NULL;
+    output = (float *)malloc(send_counts[rank] * sizeof(float));
+    // printf("%d, %d \n", row_start, col_start);
+
+    int i, j, x, y;
+
+
+    if (send_counts[rank] != 0)
+    {
+        for (i = row_start; i <= row_start + processed_rows - 1; i++)
+        { // row
+            for (j = col_start; j < col_end; j++)
+            { // column
+                output[i * n + j] = 0;
+                for (x = 0; x < p; x++)
+                { // kernel row
+                    for (y = 0; y < p; y++)
+                    { // kernel column
+                        output[i * n + j] += chunk[(i - b_lower + x) * n + (j - b_lower + y)] * B[x * p + y];
+                    }
+                }
+            }
         }
     }
 
-    // Gather the sorted blocks on the root process
-    MPI_Gather(temp_arr, end - start + 1, MPI_FLOAT, global_arr, end - start + 1, MPI_FLOAT, ROOT, MPI_COMM_WORLD);
+    //overwrite the output onto the input chunk
+    for (int i = row_start; i <= row_start + processed_rows; i++)
+    { // row
+        for (int j = col_start; j < col_end; j++)
+        { // column
 
-    // Print the sorted array on the root process
-    // if (my_rank == ROOT)
-    // {
-    //     //compare with sorted.txt
-    //     FILE *fp;
-    //     fp = fopen("sorted.txt", "r");
-    //     if (fp == NULL)
-    //     {
-    //         printf("Error opening file\n");
-    //         exit(1);
-    //     }
+            chunk[i * n + j] = output[i * n + j];
+        }
+    }
 
-    //     int n;
-    //     fscanf(fp, "%d", &n);
-    //     float *arr = malloc(n * sizeof(float));
-    //     for (int i = 0; i < n; i++)
-    //         fscanf(fp, "%f", &arr[i]);
-    //     fclose(fp);
+    float *return_chunk = NULL;
+    return_chunk = (float *)malloc(processed_rows * n * sizeof(float));
 
-    //     int flag = 0;
-    //     for (int i = 0; i < n; i++)
-    //     {
+    //copy the inner layer of the chunk to the return chunk
+    for(int i = 0; i < processed_rows; i++){
+        for(int j = 0; j < n; j++){
+            return_chunk[i*n+j] = chunk[(i+row_start)*n+j];
+        }
+    }
 
-    //         if (global_arr[i] != arr[i])
-    //         {
-    //             printf("\nSorted array is incorrect at %d\n, %f %f", i, global_arr[i], arr[i]);
-    //             flag += 1;
-    //             break;
-    //         }
-    //     }
-    //     if (flag)
-    //         printf("Sorted array is incorrect %d\n", flag);
-    //     else
-    //         printf("Sorted array is correct\n");
+    //print chunk
+    // for (int i = 0; i <= send_counts[rank]; i++)
+    // { // row
+    //     if (i % n == 0)
+    //         printf("\n");
+    //     printf("%d ", chunk[i]);
+    
     // }
 
-    if(my_rank == ROOT)
-    {
-        for (int i = 1; i < n; i++){
-            float diff = global_arr[i] - arr[i];
-            if(diff > 0.0001 || diff < -0.0001)
-            {
-                printf("Sorted array is incorrect at %d\n, %f %f", i, global_arr[i], arr[i]);
-                break;
-            }
-            else
-                printf("Sorted array is correct\n");
+    //print return chunk
+    // for (int i = 0; i <= processed_rows * n; i++)
+    // { // row
+    //     if (i % n == 0)
+    //         printf("\n");
+    //     printf("%d ", return_chunk[i]);
+    // }
 
+    int *recv_counts = NULL;
+    int *recv_displs = NULL;
+
+    recv_counts = (int *)malloc(num_procs * sizeof(int));
+    recv_displs = (int *)malloc(num_procs * sizeof(int));
+
+    for (int i = 0; i < num_procs; i++)
+    {
+        if (send_counts[i] == 0)
+            recv_counts[i] = 0;
+        else
+        {
+            
+            int no_margin = (send_counts[i] - (b_lower + b_upper) * n); // remove top and bottom margins, this is number of rows
+            recv_counts[i] = no_margin;
         }
-        printf("\n");
+
+        if (i == 0)
+            recv_displs[i] = b_lower * n;
+        else
+            recv_displs[i] = recv_displs[i - 1] + recv_counts[i - 1];
+
+        if(rank == 0){
+            for (int i = 0; i < num_procs; i++)
+            {
+                printf("recv_counts[%d]: %d \n", i, recv_counts[i]);
+                printf("recv_displs[%d]: %d \n", i, recv_displs[i]);
+            }
+        }
     }
+
+    // gather
+    MPI_Gatherv(return_chunk, recv_counts[rank], MPI_FLOAT, C, recv_counts, recv_displs, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+
+    // if (rank == 0)
+    // {
+    //     for (int i = 0; i < m * n; i++)
+    //     {
+    //         if (i % n == 0)
+    //             printf("\n");
+    //         printf("%d ", C[i]);
+    //     }
+    // }
+
+    // read the output to compare
+    fp = fopen(output_file, "r");
+    float *output_array = (float *)malloc(m * n * sizeof(float));
+
+    if (rank == 0)
+    {
+
+        int dummy;
+        fscanf(fp, "%d %d %d", &dummy, &dummy, &dummy);
+        for (int i = 0; i < m * n; i++)
+        {
+            fscanf(fp, "%f", &output_array[i]);
+        }
+
+        // compare the output
+        int error = 0;
+        for (int i = 0; i < m * n; i++)
+        {
+            if ((C[i] - output_array[i]) > 1e-6)
+            {
+                printf("Error at index %d, expected %f, got %f \n", i, output_array[i], C[i]);
+                error = 1;
+                // break;
+            }
+        }
+
+        if (error == 0)
+            printf("Correct output \n");
+        else
+            printf("Incorrect output \n");
+    }
+
+
+
+    //     /*
+
+    //     |--------------------------------------------------|
+    //     |                                                  |
+    //     |                                                  |
+    //     |         GATHERING THE WORK                       |
+    //     |                                                  |
+    //     |                                                  |
+    //     |--------------------------------------------------|
     MPI_Finalize();
+
     return 0;
 }
-
-
-
