@@ -48,17 +48,11 @@ echo compiling $SRC to $EXE
 mpiicc -O0 $SRC -o $EXE -std=c99 && \
       (
         
-        echo "Running ${EXE} with 1 MPI processes"
-        mpirun -np 1 ./${EXE} input_64_100_100.dat kernel_5.dat output_64_100_100.dat
-        echo "Running ${EXE} with 2 MPI processes"
-        mpirun -np 2 ./${EXE} input_64_100_200.dat kernel_5.dat output_64_100_200.dat
-        echo "Running ${EXE} with 4 MPI processes"
-        mpirun -np 4 ./${EXE} input_64_100_400.dat kernel_5.dat output_64_100_400.dat
-        echo "Running ${EXE} with 8 MPI processes"
-        mpirun -np 8 ./${EXE} input_64_100_800.dat kernel_5.dat output_64_100_800.dat
-        echo "Running ${EXE} with 16 MPI processes"
-        mpirun -np 16 ./${EXE} input_64_100_1600.dat kernel_5.dat output_64_100_1600.dat
-        echo "Running ${EXE} with 32 MPI processes"
-        mpirun -np 32 ./${EXE} input_64_100_3200.dat kernel_5.dat output_64_100_3200.dat
+        for i in 1 2 4 8 16 32
+        do
+          echo "Running ${EXE} with $i MPI processes"
+          #loop 3 times
+          mpirun -np $i ./${EXE} input_{i*32}_100_100.dat kernel_5.dat output_{i*32}_100_100.dat
+        done
       ) \
       || echo $SRC did not built to $EXE
