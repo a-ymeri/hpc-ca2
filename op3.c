@@ -24,7 +24,6 @@ int cmp(const void *a, const void *b)
 // function that checks if the array is sorted
 int is_sorted(float *arr, int n)
 {
-    printf("%d",n);
     for (int i = 0; i < n - 1; i++)
         if (arr[i] > arr[i + 1])
             return 0;
@@ -49,11 +48,16 @@ void merge(float *arr1, float *arr2, float *arr, int n1, int n2)
 
 int main(int argc, char *argv[])
 {
+
     int rank, num_procs;
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
+
+
+    double start, start2, end, end2;
+    start = MPI_Wtime();
     //start timer
     double start = MPI_Wtime(), start2;
 
@@ -112,6 +116,8 @@ int main(int argc, char *argv[])
 
     float *temp_arr = malloc(send_count[rank] * sizeof(float));
 
+
+    start2 = MPI_Wtime();
     // Scatter the input array to all processes
     MPI_Scatterv(unsorted_arr, send_count, displs, MPI_FLOAT, temp_arr, send_count[rank], MPI_FLOAT, ROOT, MPI_COMM_WORLD);
 
@@ -161,15 +167,13 @@ int main(int argc, char *argv[])
         d *= 2;
     }
 
+
+    end2 = MPI_Wtime();
     if (rank == ROOT)
     {
-        printf("Rank %d is sorted: %d \n", rank, is_sorted(temp_arr, send_count[rank]));
 
         //end timer
         double end = MPI_Wtime();
-
-        printf("Time taken: %f \n", end - start);
-        printf("Time taken since loading data: %f \n", end - start2);
 
         // Write sorted data to file "b.dat"
         FILE *fp;
@@ -188,6 +192,12 @@ int main(int argc, char *argv[])
 
     }
 
+    end = MPI_Wtime();
+
+    if (rank == 0){
+        printf("Time taken without io: %f", end2 - start2);
+        printf("Time taken: %f \n", end - start);
+    }
 
 
 

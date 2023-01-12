@@ -60,10 +60,9 @@ mpiicc -O0 $SRC -o $EXE -std=c99 && \
       (
         for i in 1 2 4 8 16 32
         do
-          #loop 3 times
+          echo "Running ${EXE} with $i MPI processes"
           for j in {1..3}
           do
-            echo "Running ${EXE} with $i MPI processes"
             mpirun -np $i ./${EXE} $1 $2 $3
           done
         done

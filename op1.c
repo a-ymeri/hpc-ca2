@@ -43,12 +43,7 @@ int main(int argc, char **argv)
         for (int i = 0; i < b* m * n; i++)
         {
             fscanf(fp, "%f", &A[i]);
-            if(i == b*m*n-1){
-                printf("A[%d] = %f \n", i, A[i]);
-            }
         }
-        printf("this: %f",A[31457279]);
-
     }
 
     
@@ -86,6 +81,7 @@ int main(int argc, char **argv)
 
     //   */
 
+    double start_of_work = MPI_Wtime();
     // floor of p-1 / 2
     int b_lower = (p - 1) / 2;
     // ceiling of p-1 / 2
@@ -138,10 +134,6 @@ int main(int argc, char **argv)
     float *output = (float *)malloc(chunk_size * sizeof(float));
     for(int i = 0; i < chunk_size; i++){
         output[i] = chunk[i];
-        if(i > (chunk_size-10)){
-            printf("output[%d] = %f \n, %d", i, output[i], chunk_size);
-        }
-
     }
 
     // printf("rank: %d, chunk_size: %f \n", rank, chunk_size);
@@ -212,17 +204,26 @@ int main(int argc, char **argv)
     //         printf("Incorrect output %d\n", error);
     // }
 
+    //time end of work
+    double end_of_work = MPI_Wtime();
     if (rank == 0){
         //write output to file
         fp = fopen(output_file, "w");
 
-        printf("\n %f", C[31457279]);
+        // printf("\n %f", C[31457279]);
         fprintf(fp, "%d %d %d \n", b, m, n);
         for (int i = 0; i < b * m * n; i++)
         {
             fprintf(fp, "%f ", C[i]);
             
         }
+    }
+
+    double end = MPI_Wtime();
+
+    if (rank == 0){
+        printf("Time taken for work: %f \n", end_of_work - start_of_work);
+        printf("Time taken in total: %f \n", end - start);
     }
 
     //  //read output from file

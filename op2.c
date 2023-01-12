@@ -88,7 +88,6 @@ int main(int argc, char *argv[]) {
 
   */
     int rows_per_proc = m / num_procs;
-    printf("rows_per_proc: %d", rows_per_proc);
     int remainder = m % num_procs;
 
     int *send_counts = NULL;
@@ -104,8 +103,6 @@ int main(int argc, char *argv[]) {
             send_counts[i] += n;
         }
 
-        if(rank == 0)
-            // printf("send_counts[%d]: %d \n", i, send_counts[i]);
 
         displs[i] = 0;
         if (i > 0) {
@@ -115,13 +112,12 @@ int main(int argc, char *argv[]) {
     
     // allocate memory for the chunk
     float *chunk = (float *)malloc(send_counts[rank] * sizeof(float));
-    printf("rank: %d, send_counts: %d \n", rank, send_counts[rank]);
 
     //mpi block so we can time it
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    double scatter_start = MPI_Wtime();
+    double work_start = MPI_Wtime();
 
     MPI_Scatterv(A, send_counts, displs, MPI_FLOAT, chunk, send_counts[rank], MPI_FLOAT, 0, MPI_COMM_WORLD);
 
@@ -165,7 +161,6 @@ int main(int argc, char *argv[]) {
     
     double local_end = MPI_Wtime();
 
-    printf("rank: %d, local time: %f \n", rank, local_end - local_start);
 
     /*
 
@@ -206,17 +201,7 @@ int main(int argc, char *argv[]) {
     }
 
     MPI_Gatherv(chunk_c, recv_counts[rank] , MPI_INT, final_data, recv_counts, displs, MPI_INT, 0, MPI_COMM_WORLD);
-
-
-    //get time
-    double end = MPI_Wtime();
-    double time = end - start;
-
-    //print time in seconds
-    if(rank == 0){
-        printf("Time including data load: %f \n", time);
-        printf("Time excluding data load: %f \n", end - scatter_start);
-    }
+  
 
     
     // print the final array on rank a0
@@ -261,6 +246,8 @@ int main(int argc, char *argv[]) {
     //     }
     // }
 
+    double work_end = MPI_Wtime();
+
     if(rank == 0){
         //print the result to c_file
         fp = fopen(c_file, "w");
@@ -270,6 +257,13 @@ int main(int argc, char *argv[]) {
         }
 
         fclose(fp);
+    }
+
+    double end = MPI_Wtime();
+
+    if(rank == 0){
+        printf("total time: %f \n", end - start);
+        printf("work time: %f \n", work_end - work_start);
     }
 
 // clean up memory and finalize MPI
