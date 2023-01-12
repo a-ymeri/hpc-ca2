@@ -40,7 +40,7 @@ echo "Scheduling priority          : $SLURM_PRIO_PROCESS"
 
 
 # parallel using MPI
-SRC=op3.c
+SRC=op1.c
 EXE=${SRC%%.c}.exe
 echo compiling $SRC to $EXE
 
@@ -60,8 +60,12 @@ mpiicc -O0 $SRC -o $EXE -std=c99 && \
       (
         for i in 1 2 4 8 16 32
         do
-          echo "Running ${EXE} with $i MPI processes"
-          mpirun -np $i ./${EXE} a.dat b.dat c.dat
+          #loop 3 times
+          for j in {1..3}
+          do
+            echo "Running ${EXE} with $i MPI processes"
+            mpirun -np $i ./${EXE} $1 $2 $3
+          done
         done
       ) \
       || echo $SRC did not built to $EXE

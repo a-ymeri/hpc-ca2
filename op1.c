@@ -40,18 +40,27 @@ int main(int argc, char **argv)
     if (rank == 0)
     {
         A = (float *)malloc(sizeof(float) * b * m * n);
-        for (int i = 0; i < m * n; i++)
+        for (int i = 0; i < b* m * n; i++)
         {
             fscanf(fp, "%f", &A[i]);
+            if(i == b*m*n-1){
+                printf("A[%d] = %f \n", i, A[i]);
+            }
         }
+        printf("this: %f",A[31457279]);
+
     }
+
+    
+
+
     // read b.dat
     fp = fopen(kernel, "r");
 
     float *C = NULL;
     if (rank == 0)
     {
-        C = (float *)malloc(sizeof(float) * m * n);
+        C = (float *)malloc(sizeof(float) * b * m * n);
     }
 
     int p;
@@ -77,17 +86,17 @@ int main(int argc, char **argv)
 
     //   */
 
-    // // floor of p-1 / 2
-    // int b_lower = (p - 1) / 2;
-    // // ceiling of p-1 / 2
-    // int b_upper = p / 2;
-    // // where to begin and end the row iterator
-    // int row_start = b_lower;
-    // int row_end = m - b_upper;
+    // floor of p-1 / 2
+    int b_lower = (p - 1) / 2;
+    // ceiling of p-1 / 2
+    int b_upper = p / 2;
+    // where to begin and end the row iterator
+    int row_start = b_lower;
+    int row_end = m - b_upper;
 
-    // // where to begin and end the col iterator
-    // int col_start = b_lower;
-    // int col_end = n - b_upper;
+    // where to begin and end the col iterator
+    int col_start = b_lower;
+    int col_end = n - b_upper;
 
     int matrices_per_process = b / num_procs;
     int remainder = b % num_procs;
@@ -115,179 +124,84 @@ int main(int argc, char **argv)
     }
 
     // allocate memory for the chunk
-    float chunk_size = send_counts[rank]; 
+    int chunk_size = send_counts[rank]; 
 
     float *chunk = (float *)malloc(chunk_size * sizeof(float));
 
-    MPI_Barrier(MPI_COMM_WORLD);
 
 
-    int start1 = displs[rank];
-    int end1 = displs[rank] + send_counts[rank];
 
-    // printf("rank: %d, start: %d, end: %d \n", rank, start1, end1);
-    // printf("First element: %f \n", A[start1]);
-    // scatter the data to all processes
+    //scatter
     MPI_Scatterv(A, send_counts, displs, MPI_FLOAT, chunk, chunk_size, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
+    //copy chunk to output
+    float *output = (float *)malloc(chunk_size * sizeof(float));
+    for(int i = 0; i < chunk_size; i++){
+        output[i] = chunk[i];
+        if(i > (chunk_size-10)){
+            printf("output[%d] = %f \n, %d", i, output[i], chunk_size);
+        }
 
+    }
 
-    //print chunk size per rank
-    printf("Rank: %d, chunk size: %f \n", rank, chunk_size);
+    // printf("rank: %d, chunk_size: %f \n", rank, chunk_size);
 
-    // double scatter_start = MPI_Wtime();
+    //split chunk into b matrices
+    for (int i = 0; i<(chunk_size/(m*n)); i++){
+        // if(rank == 0)
+            // printf("i = %d", i );
+        float *matrix = (float *)malloc(m*n*sizeof(float));
+        for(int j = 0; j < m*n; j++){
+            matrix[j] = chunk[i*m*n + j];
+        }
+        //apply convolution
+        for (int j = row_start; j < row_end; j++)
+        {
+            for (int k = col_start; k < col_end; k++)
+            {
+                float sum = 0;
+                for (int l = 0; l < p; l++)
+                {
+                    for (int m = 0; m < p; m++)
+                    {
+                        sum += matrix[(j - b_lower + l) * n + (k - b_lower + m)] * B[l * p + m];
+                    }
+                }
+                output[i*m*n + j*n + k] = sum;
 
-    // if(rank == 0){
-    //     //copy outer layer of A to C
-    //     for (int i=0; i<m; i++) {
-    //         for (int j=0; j<n; j++) {
-    //             if(i < row_start || i >= row_end || j < col_start || j >= col_end) { //only cope outer layer
-    //                 C[i*n+j] = A[i*n+j];
-    //             }
-    //         }
-    // }
-
-    // }
-
-    // scatter the data to all processes
-
-    // if(rank == 0){
-    //     //print send_counts and displs
-    //     for(int i = 0; i < num_procs; i++){
-    //         printf("send_counts[%d]: %d, displs[%d]: %d \n", i, send_counts[i], i, displs[i]);
-    //     }
-    // }
-
+            }
+        }
+    }
     
-
-    //   /*
-
-    //     |--------------------------------------------------|
-    //     |                                                  |
-    //     |                                                  |
-    //     |         PERFORMING THE WORK                      |
-    //     |                                                  |
-    //     |                                                  |
-    //     |--------------------------------------------------|
-
-    double local_start = MPI_Wtime();
+    //gather the data to all processes
+    MPI_Gatherv(output, chunk_size, MPI_FLOAT, C, send_counts, displs, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
 
 
-    // int row_count = send_counts[rank] / n;
-    // int processed_rows = row_count - b_lower - b_upper;
-
-    // float *output = NULL;
-    // output = (float *)malloc(send_counts[rank] * sizeof(float));
-    // // printf("%d, %d \n", row_start, col_start);
-
-    // int i, j, x, y;
-
-
-    // if (send_counts[rank] != 0)
-    // {
-    //     for (i = row_start; i <= row_start + processed_rows - 1; i++)
-    //     { // row
-    //         for (j = col_start; j < col_end; j++)
-    //         { // column
-    //             output[i * n + j] = 0;
-    //             for (x = 0; x < p; x++)
-    //             { // kernel row
-    //                 for (y = 0; y < p; y++)
-    //                 { // kernel column
-    //                     output[i * n + j] += chunk[(i - b_lower + x) * n + (j - b_lower + y)] * B[x * p + y];
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // //overwrite the output onto the input chunk
-    // for (int i = row_start; i <= row_start + processed_rows; i++)
-    // { // row
-    //     for (int j = col_start; j < col_end; j++)
-    //     { // column
-
-    //         chunk[i * n + j] = output[i * n + j];
-    //     }
-    // }
-
-    // float *return_chunk = NULL;
-    // return_chunk = (float *)malloc(processed_rows * n * sizeof(float));
-
-    // //copy the inner layer of the chunk to the return chunk
-    // for(int i = 0; i < processed_rows; i++){
-    //     for(int j = 0; j < n; j++){
-    //         return_chunk[i*n+j] = chunk[(i+row_start)*n+j];
-    //     }
-    // }
-    // int *recv_counts = NULL;
-    // int *recv_displs = NULL;
-
-    // recv_counts = (int *)malloc(num_procs * sizeof(int));
-    // recv_displs = (int *)malloc(num_procs * sizeof(int));
-
-    // for (int i = 0; i < num_procs; i++)
-    // {
-    //     if (send_counts[i] == 0)
-    //         recv_counts[i] = 0;
-    //     else
-    //     {
-            
-    //         int no_margin = (send_counts[i] - (b_lower + b_upper) * n); // remove top and bottom margins, this is number of rows
-    //         recv_counts[i] = no_margin;
-    //     }
-
-    //     if (i == 0)
-    //         recv_displs[i] = b_lower * n;
-    //     else
-    //         recv_displs[i] = recv_displs[i - 1] + recv_counts[i - 1];
-
-    //     if(rank == 0){
-    //         for (int i = 0; i < num_procs; i++)
-    //         {
-    //             printf("recv_counts[%d]: %d \n", i, recv_counts[i]);
-    //             printf("recv_displs[%d]: %d \n", i, recv_displs[i]);
-    //         }
-    //     }
-    // }
-
-    // // gather
-    // MPI_Gatherv(return_chunk, recv_counts[rank], MPI_FLOAT, C, recv_counts, recv_displs, MPI_FLOAT, 0, MPI_COMM_WORLD);
-
-
-    // // if (rank == 0)
-    // // {
-    // //     for (int i = 0; i < m * n; i++)
-    // //     {
-    // //         if (i % n == 0)
-    // //             printf("\n");
-    // //         printf("%d ", C[i]);
-    // //     }
-    // // }
-
-    // // read the output to compare
-    // fp = fopen(output_file, "r");
-    // float *output_array = (float *)malloc(m * n * sizeof(float));
-
-    // if (rank == 0)
-    // {
-
+    //     // compare the output
+    // if(rank == 0){
+    //     //read output from file
+    //     fp = fopen(output_file, "r");
+    //     float *output_array = NULL;
+    //     output_array = (float *)malloc(sizeof(float) * b * m * n);
     //     int dummy;
-    //     fscanf(fp, "%d %d %d", &dummy, &dummy, &dummy);
-    //     for (int i = 0; i < m * n; i++)
+    //     fscanf(fp, "%d %d %d", &dummy, &dummy, &dummy);        
+    //     for (int i = 0; i < b * m * n; i++)
     //     {
     //         fscanf(fp, "%f", &output_array[i]);
     //     }
 
-    //     // compare the output
+
     //     int error = 0;
-    //     for (int i = 0; i < m * n; i++)
+    //     for (int i = 0; i < b * m * n; i++)
     //     {
     //         if ((C[i] - output_array[i]) > 1e-6)
     //         {
-    //             printf("Error at index %d, expected %f, got %f \n", i, output_array[i], C[i]);
-    //             error = 1;
+    //             if(error < 1){
+    //             // printf("Error at index %d, expected %f, got %f \n", i, output_array[i], C[i]);
+
+    //             }
+    //             error++;
     //             // break;
     //         }
     //     }
@@ -295,7 +209,34 @@ int main(int argc, char **argv)
     //     if (error == 0)
     //         printf("Correct output \n");
     //     else
-    //         printf("Incorrect output \n");
+    //         printf("Incorrect output %d\n", error);
+    // }
+
+    if (rank == 0){
+        //write output to file
+        fp = fopen(output_file, "w");
+
+        printf("\n %f", C[31457279]);
+        fprintf(fp, "%d %d %d \n", b, m, n);
+        for (int i = 0; i < b * m * n; i++)
+        {
+            fprintf(fp, "%f ", C[i]);
+            
+        }
+    }
+
+    //  //read output from file
+    //     fp = fopen(output_file, "r");
+    //     float *output_array = NULL;
+    //     output_array = (float *)malloc(sizeof(float) * m * n);
+    //     int dummy;
+    //     fscanf(fp, "%d %d %d", &dummy, &dummy, &dummy);        
+    //     for (int i = 0; i < m * n; i++)
+    //     {
+    //         fscanf(fp, "%f", &output_array[i]);
+    //     }
+
+
     // }
 
 
