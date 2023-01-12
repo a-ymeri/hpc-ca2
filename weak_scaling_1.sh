@@ -49,10 +49,11 @@ mpiicc -O0 $SRC -o $EXE -std=c99 && \
       (
         
         for i in 1 2 4 8 16 32
+        k = $(($i*32))
         do
           echo "Running ${EXE} with $i MPI processes. input_${i*32}_100_100.dat "
           #loop 3 times
-          mpirun -np $i ./${EXE} "input_${i*32}_100_100.dat" kernel_5.dat "output_${i*32}_100_100.dat"
+          mpirun -np $i ./${EXE} "input_${k}_100_100.dat" kernel_5.dat "output_${k}_100_100.dat"
         done
       ) \
       || echo $SRC did not built to $EXE
