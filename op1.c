@@ -35,19 +35,17 @@ int main(int argc, char **argv)
 
     // second line of a.dat is the array
     float *A = NULL;
+     fp = fopen(input, "r");
+        fscanf(fp, "%d %d %d", &b, &m, &n);
     if (rank == 0)
     {
-        fp = fopen(input, "r");
-        fscanf(fp, "%d %d %d", &b, &m, &n);
+       
         A = (float *)malloc(sizeof(float) * b * m * n);
         for (int i = 0; i < b* m * n; i++)
         {
             fscanf(fp, "%f", &A[i]);
         }
-        //broadcast b, m and n
-        MPI_Bcast(&b, 1, MPI_INT, 0, MPI_COMM_WORLD);
-        MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
-        MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
     }
 
     
