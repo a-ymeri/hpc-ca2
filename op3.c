@@ -58,8 +58,6 @@ int main(int argc, char *argv[])
 
     double start, start2, end, end2;
     start = MPI_Wtime();
-    //start timer
-    double start = MPI_Wtime(), start2;
 
     // Read input data from file "a.dat"
 

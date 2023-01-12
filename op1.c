@@ -27,30 +27,33 @@ int main(int argc, char **argv)
     // read a.dat
 
     FILE *fp;
-    fp = fopen(input, "r");
     int m, n; // a dimensions, m rows, n columns, b batches
 
     // first line of a.dat is n and m
     int b;
-    fscanf(fp, "%d %d %d", &b, &m, &n);
     // b = b;
 
     // second line of a.dat is the array
     float *A = NULL;
     if (rank == 0)
     {
+        fp = fopen(input, "r");
+        fscanf(fp, "%d %d %d", &b, &m, &n);
         A = (float *)malloc(sizeof(float) * b * m * n);
         for (int i = 0; i < b* m * n; i++)
         {
             fscanf(fp, "%f", &A[i]);
         }
+        //broadcast b, m and n
+        MPI_Bcast(&b, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
     }
 
     
 
 
     // read b.dat
-    fp = fopen(kernel, "r");
 
     float *C = NULL;
     if (rank == 0)
@@ -59,6 +62,9 @@ int main(int argc, char **argv)
     }
 
     int p;
+
+    fp = fopen(kernel, "r");
+
     // first line of b.dat is p and p. Only need one of them
     fscanf(fp, "%d %d", &p, &p);
 

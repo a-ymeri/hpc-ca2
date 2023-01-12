@@ -137,8 +137,6 @@ int main(int argc, char *argv[]) {
 
     //get time
 
-    double local_start = MPI_Wtime();
-
 
     
     
