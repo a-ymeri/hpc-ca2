@@ -92,7 +92,6 @@ int main(int argc, char *argv[])
     //broadcast n
     MPI_Bcast(&n, 1, MPI_INT, ROOT, MPI_COMM_WORLD);
 
-    // Allocate memory for temporary and sorted arrays
     float *global_arr = malloc(n * sizeof(float));
 
     // Calculate the send_count and displacements for the scatter operation
@@ -112,6 +111,7 @@ int main(int argc, char *argv[])
         displs[i] = i == 0 ? 0 : displs[i - 1] + send_count[i - 1];
     }
 
+    // Allocate memory for the local array
     float *temp_arr = malloc(send_count[rank] * sizeof(float));
 
 
@@ -122,22 +122,13 @@ int main(int argc, char *argv[])
     // Sort the block assigned to each process
     qsort(temp_arr, send_count[rank], sizeof(float), cmp);
 
-    // each rank checks if its sorted
-    // printf("Rank %d is sorted: %d \n", rank, is_sorted(temp_arr, send_count[rank]));
-
-
-    //create array from 0 to num_procs
-    int *arr = malloc(num_procs * sizeof(int));
-    for (int i = 0; i < num_procs; i++)
-        arr[i] = i;
-
 
  // Perform iterative merging of data
     int d = 1;
-    int log2_procs = log2_(num_procs);
+    int log2_procs = log2_(num_procs); // since the merges are done in log2(p) steps
     for (int i = 0; i < log2_procs; i++)
     {
-        int partner = rank ^ d;
+        int partner = rank ^ d; // bitwise XOR to find the partner process
         if (rank < partner)
         {
             // Receive data from partner
@@ -148,8 +139,6 @@ int main(int argc, char *argv[])
 
             // Merge received data with local data
             merge(temp_arr, recv_arr, global_arr, send_count[rank], recv_count);
-            // free(temp_arr);
-            // free(recv_arr);
 
             // Update local data
             temp_arr = global_arr;
